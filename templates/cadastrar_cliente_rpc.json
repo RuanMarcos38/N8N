@@ -1,0 +1,18 @@
+{
+  "p_client_name": "NOME DO CLIENTE",
+  "p_business_id": "BM_ID",
+  "p_ad_account_id": "AD_ACCOUNT_ID_SEM_ACT",
+  "p_channel": "whatsapp",
+  "p_destination": "5547999999999",
+  "p_send_time": "08:00:00",
+  "p_timezone": "America/Sao_Paulo",
+  "p_currency": "BRL",
+  "p_send_days": [1, 2, 3, 4, 5, 6, 7],
+  "p_conversion_action_types": [
+    "lead",
+    "onsite_conversion.messaging_conversation_started_7d"
+  ],
+  "p_attribution_windows": ["7d_click", "1d_view"],
+  "p_channel_config": {"instance": "R2R"},
+  "p_active": false
+}

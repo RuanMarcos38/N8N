@@ -1,0 +1,100 @@
+{
+  "name": "R2R | Error Handler - Relatórios Meta ads",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "62f1961f-ab5e-498f-971a-e03f955cc6a9",
+      "name": "Erro do Workflow",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        -420,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const payload = $json;\nconst execution = payload.execution || {};\nconst trigger = payload.trigger || {};\nconst workflow = payload.workflow || {};\nconst error = execution.error || trigger.error || {};\nconst message = error.message || error.cause?.message || 'Erro não identificado';\n\nreturn [{\n  json: {\n    text: `🚨 Falha no fluxo de relatório Meta ads\n\nFluxo: ${workflow.name || 'desconhecido'}\nExecução: ${execution.id || 'sem ID'}\nÚltimo nó: ${execution.lastNodeExecuted || 'não informado'}\nModo: ${execution.mode || trigger.mode || 'não informado'}\nErro: ${message}\nURL: ${execution.url || 'indisponível'}\nHorário: ${new Date().toISOString()}`,\n    workflow,\n    execution,\n    error,\n  },\n}];"
+      },
+      "id": "39cbc765-568a-4c89-b378-97c520627028",
+      "name": "Formatar Alerta Interno",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -180,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.INTERNAL_ALERT_WEBHOOK_URL }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { text: $json.text, workflow: $json.workflow, execution: $json.execution } }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "e1beec62-f453-4404-ac55-ec60124fb2bf",
+      "name": "Enviar Alerta Interno",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        60,
+        0
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 10000
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Erro do Workflow": {
+      "main": [
+        [
+          {
+            "node": "Formatar Alerta Interno",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Formatar Alerta Interno": {
+      "main": [
+        [
+          {
+            "node": "Enviar Alerta Interno",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Sao_Paulo",
+    "saveManualExecutions": true,
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all"
+  },
+  "versionId": "64ffec71-098b-4a8d-876a-e355ff487ee1",
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "instanceId": ""
+  },
+  "tags": []
+}

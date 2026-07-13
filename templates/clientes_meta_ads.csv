@@ -1,0 +1,2 @@
+client_name,business_id,ad_account_id,timezone,currency,channel,destination,send_time,send_days,conversion_action_types,attribution_windows,channel_config,active
+NOME_DO_CLIENTE,BM_ID,AD_ACCOUNT_ID,America/Sao_Paulo,BRL,whatsapp,5547999999999,08:00,"{1,2,3,4,5,6,7}","{lead,onsite_conversion.messaging_conversation_started_7d}","{7d_click,1d_view}","{\"instance\":\"R2R\"}",false
