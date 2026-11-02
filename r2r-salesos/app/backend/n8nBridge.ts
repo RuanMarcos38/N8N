@@ -2,7 +2,7 @@ import { db, secrets } from './runtime.ts';
 
 type RecordValue = Record<string, any>;
 export const installationOwnerEmail = process.env.N8N_CONNECTION_OWNER_EMAIL || '';
-export const aiCallbackUrl = (process.env.APP_URL || 'http://localhost:3000') + '/api/salesos/n8n/ai/result';
+export const aiCallbackUrl = process.env.AI_CALLBACK_URL || (process.env.APP_URL || 'http://localhost:3000') + '/api/salesos/n8n/ai/result';
 export const n8nGatewayUrl = 'https://n8n-n8n.ke4n49.easypanel.host/webhook/r2r-salesos/v1';
 const table = 'salesos_bridge_connection';
 
