@@ -33,6 +33,7 @@ export const db={
 export const json=(body:any,statusCode=200)=>({statusCode,body});
 export const error=(message:string,statusCode=400)=>json({error:message},statusCode);
 export const requireAuth=()=>async(c:Context)=>c.user?undefined:error('Entre na sua conta.',401);
+export const requireAdminEmailAllowlist = (emails: string[]) => async (c: Context) => emails.some(email => email && c.user?.email?.toLowerCase() === email.toLowerCase()) ? undefined : error('A conexão deve ser configurada pelo proprietário da instalação.', 403);
 export const router=(routes:RouterRoutes)=>routes;
 const secretNames=['N8N_WEBHOOK_URL','N8N_WEBHOOK_TOKEN','SALESOS_LIVE_DISPATCH_APPROVED','SALESOS_EVENT_TOKEN','WHATSAPP_ACCESS_TOKEN','WHATSAPP_PHONE_NUMBER_ID','EMAIL_PROVIDER_KEY','VAPI_API_KEY','VAPI_ASSISTANT_ID','VAPI_PHONE_NUMBER_ID','RETELL_API_KEY','ASAAS_SANDBOX_API_KEY','ASAAS_CUSTOMER_ID','ASAAS_WEBHOOK_TOKEN','AI_DRAFT_WEBHOOK_URL','AI_DRAFT_WEBHOOK_TOKEN'];
 export const secrets={listSecretNames:async()=>secretNames.filter(k=>!!process.env[k]),readSecret:async(k:string)=>{if(!secretNames.includes(k))throw Error('Configuração inválida.');return process.env[k]||'';}};

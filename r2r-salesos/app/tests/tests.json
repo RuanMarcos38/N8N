@@ -9,16 +9,24 @@
       "cadastro e persistência de lead",
       "LGPD validação",
       "GET /api/salesos/bootstrap",
-      "POST /api/salesos/leads"
+      "POST /api/salesos/leads",
+      "pipeline drag/drop",
+      "atualização de estágio",
+      "contato bloqueado",
+      "PUT /api/salesos/leads/:id",
+      "auditoria"
     ],
     "description": "Cria uma empresa e adiciona um lead com origem e base legal comprovadas.",
     "steps": [
       "Entrar na conta",
       "Clicar Nova empresa e cadastrar Operação de Teste",
       "Abrir Contatos & Empresas e criar lead Paula Teste com e-mail, origem Formulário e consentimento",
-      "Atualizar e confirmar a permanência de Operação de Teste e Paula Teste"
+      "Atualizar e confirmar a permanência de Operação de Teste e Paula Teste",
+      "Na empresa Operação de Teste, abrir Pipeline Comercial e mover Paula Teste para Validado",
+      "Conferir o novo estágio em Contatos & Empresas, bloquear Paula Teste e confirmar",
+      "Verificar que o contato bloqueado deixa o pipeline ativo"
     ],
-    "expected": "Empresa e lead cadastrados continuam no ambiente após atualização."
+    "expected": "Empresa e lead cadastrados continuam no ambiente após atualização. O estágio é atualizado e o contato bloqueado deixa o pipeline ativo."
   },
   {
     "name": "Criar campanha e preservar bloqueio de produção",
@@ -43,28 +51,6 @@
     "expected": "A campanha permanece parada e o backend recusa ativação não homologada."
   },
   {
-    "name": "Kanban com avanço e supressão de contato",
-    "viewport": "desktop",
-    "covers": [
-      "pipeline drag/drop",
-      "atualização de estágio",
-      "contato bloqueado",
-      "PUT /api/salesos/leads/:id",
-      "auditoria"
-    ],
-    "description": "Permite alterar estágio e interromper contatos por oposição.",
-    "setup": [
-      "Criar empresa Teste Kanban e lead Leo Teste com consentimento"
-    ],
-    "steps": [
-      "Abrir Pipeline Comercial e mover Leo Teste para Validado",
-      "Abrir Contatos & Empresas e confirmar etapa Validado",
-      "Bloquear contato Leo Teste e confirmar",
-      "Verificar que o contato não aparece em colunas de prospecção"
-    ],
-    "expected": "Etapa muda e o bloqueio impede reapresentação no pipeline ativo."
-  },
-  {
     "name": "Agente e base de conhecimento com conteúdo persistente",
     "viewport": "mobile",
     "covers": [
@@ -72,7 +58,13 @@
       "configuração de agente",
       "conhecimento textual",
       "POST /api/salesos/records/:kind",
-      "GET /api/salesos/bootstrap"
+      "GET /api/salesos/bootstrap",
+      "GET /api/salesos/intelligence",
+      "PUT /api/salesos/intelligence",
+      "salvar canal objetivo oferta e texto",
+      "editar personalização",
+      "persistência após recarregar",
+      "isolamento por empresa"
     ],
     "description": "Grava um agente não ativado e uma fonte textual por empresa.",
     "setup": [
@@ -82,9 +74,14 @@
       "No celular abrir Agentes de IA e criar agente Consultivo",
       "Conferir status de configuração não ativa",
       "Abrir Base de Conhecimento e cadastrar um texto Verificação comercial",
-      "Atualizar e conferir que ambos permanecem"
+      "Atualizar e conferir que ambos permanecem",
+      "Na empresa Operação IA, abrir Inteligência Comercial e preencher canal WhatsApp, objetivo Apresentação Studio, oferta Oferta Studio verificada e Texto da abordagem com Texto Studio inicial",
+      "Salvar personalização, abrir Visão Geral e voltar a Inteligência Comercial",
+      "Alterar Texto da abordagem para Texto Studio revisado, salvar e atualizar a página",
+      "Voltar a Inteligência Comercial da empresa Operação IA e confirmar os quatro campos salvos",
+      "Criar e selecionar empresa Studio Separado e abrir Inteligência Comercial"
     ],
-    "expected": "Agente e conhecimento permanecem visíveis, com agente sem execução autônoma."
+    "expected": "Agente e conhecimento permanecem visíveis, com agente sem execução autônoma. A empresa Operação IA mantém WhatsApp, objetivo, oferta e Texto Studio revisado; Studio Separado não mostra esses textos."
   },
   {
     "name": "Conflito de horário e carteira sem créditos inventados",
@@ -95,9 +92,11 @@
       "carteira sandbox",
       "autorização para recarga",
       "POST /api/salesos/records/appointments",
-      "POST /api/salesos/wallet/topup"
+      "POST /api/salesos/wallet/topup",
+      "POST /api/salesos/calendar/sync",
+      "erro de sincronização preserva compromisso"
     ],
-    "description": "Uma reunião persiste, o mesmo horário não deve ser duplicado e carteira vazia não mostra saldo fictício.",
+    "description": "Uma reunião persiste, o mesmo horário não deve ser duplicado e carteira vazia não mostra saldo fictício. A ação de sincronização com Google fica disponível no compromisso e exige conexão autorizada; testes com efeitos externos são feitos separadamente na instalação.",
     "setup": [
       "Criar empresa Operação Agenda"
     ],
@@ -105,8 +104,86 @@
       "Abrir Agenda Inteligente e agendar Reunião Inicial para amanhã às 14h e duração 60 min",
       "Tentar agendar uma segunda reunião para amanhã às 14h com o mesmo responsável",
       "Confirmar erro de horário ocupado",
+      "No compromisso Reunião Inicial, clicar Criar Google Meet e verificar mensagem de falha da conexão",
+      "Confirmar que Reunião Inicial continua na agenda após a falha",
       "Abrir Carteira & Recargas e verificar saldo inicial zero sem cobrança automática"
     ],
-    "expected": "A segunda reunião é recusada, o primeiro compromisso permanece e a carteira não inventa créditos."
+    "expected": "A segunda reunião é recusada, o primeiro compromisso permanece e a carteira não inventa créditos. Uma falha na sincronização com Google é visível e não apaga o compromisso local.",
+    "qa_faults": [
+      {
+        "method": "POST",
+        "path": "/api/salesos/calendar/sync",
+        "status": 503,
+        "body_json": {
+          "error": "Conexão Google indisponível no teste"
+        }
+      }
+    ]
+  },
+  {
+    "name": "Falha ao salvar preserva edição no celular",
+    "viewport": "mobile",
+    "covers": [
+      "erro de PUT /api/salesos/intelligence",
+      "preservar edição ao falhar salvamento",
+      "estado não salvo",
+      "editor no celular",
+      "GET /api/salesos/n8n/status",
+      "POST /api/salesos/n8n/test",
+      "falha de conexão visível sem declarar sucesso",
+      "POST /api/salesos/n8n/inbox",
+      "POST /api/salesos/ai/draft",
+      "falhas de IA e de sincronização não apagam dados"
+    ],
+    "description": "Uma falha de gravação exibe erro e mantém o conteúdo para nova tentativa.",
+    "setup": [
+      "Criar empresa Studio Falha"
+    ],
+    "qa_faults": [
+      {
+        "method": "PUT",
+        "path": "/api/salesos/intelligence",
+        "status": 500,
+        "body_json": {
+          "error": "Falha de gravação de teste"
+        }
+      },
+      {
+        "method": "POST",
+        "path": "/api/salesos/n8n/test",
+        "status": 500,
+        "body_json": {
+          "error": "Falha de conexão de teste"
+        }
+      },
+      {
+        "method": "POST",
+        "path": "/api/salesos/n8n/inbox",
+        "status": 503,
+        "body_json": {
+          "error": "Sincronização n8n indisponível no teste"
+        }
+      },
+      {
+        "method": "POST",
+        "path": "/api/salesos/ai/draft",
+        "status": 503,
+        "body_json": {
+          "error": "IA indisponível no teste"
+        }
+      }
+    ],
+    "steps": [
+      "Selecionar Studio Falha e abrir Inteligência Comercial pelo menu",
+      "Preencher Objetivo da abordagem com Oferta Studio Falha e Texto da abordagem com Texto preservado",
+      "Clicar Salvar personalização",
+      "Abrir Integrações e clicar Conectar e testar ferramentas",
+      "Verificar que a falha é mostrada e nenhum serviço é marcado como conectado",
+      "Voltar à Inteligência Comercial e verificar que o texto local foi preservado",
+      "Clicar Gerar rascunho com IA e verificar falha visível sem substituir o texto",
+      "Abrir Conversas 360° e clicar Sincronizar n8n",
+      "Verificar erro visível de sincronização e ausência de mensagens inventadas"
+    ],
+    "expected": "Um erro visível é mostrado, o objetivo e o texto continuam no editor e a interface não informa que o conteúdo foi salvo. A falha da conexão é exibida e o conteúdo editado permanece ao voltar ao editor."
   }
 ]

@@ -1,4 +1,5 @@
-import { db, json, error, requireAuth, ai, storage, secrets, invites, isInviteError, increment } from './runtime.ts';
+import { bridgeStatus, testBridge, bridgeEnabled, callBridge, installationOwnerEmail } from './n8nBridge.ts';
+import { db, json, error, requireAuth, requireAdminEmailAllowlist, ai, storage, secrets, invites, isInviteError, increment } from './runtime.ts';
 import type { RouterRoutes } from './runtime.ts';
 
 type R = Record<string, any>;
@@ -206,7 +207,7 @@ async function controlCampaign(c:Ctx){
   } else if(b.action==='activate'){
     if(b.confirmed!==true)throw new Error('Confirmação explícita obrigatória.');
     const keys=await secrets.listSecretNames();
-    if(!keys.includes('N8N_WEBHOOK_URL')||!keys.includes('N8N_WEBHOOK_TOKEN')||!keys.includes('SALESOS_LIVE_DISPATCH_APPROVED'))
+    if((!keys.includes('N8N_WEBHOOK_URL') && !(await bridgeEnabled(s.ownerId)))||!keys.includes('N8N_WEBHOOK_TOKEN')||!keys.includes('SALESOS_LIVE_DISPATCH_APPROVED'))
       throw new Error('Integração e homologação de produção pendentes. Campanha permanece sem disparos.');
     if((await secrets.readSecret('SALESOS_LIVE_DISPATCH_APPROVED'))!=='approved')
       throw new Error('Homologação de produção não concluída.');
@@ -296,7 +297,9 @@ async function generateDraft(c:Ctx){
   const knowledge=(await all(tab('knowledge',s.ownerId),100)).filter(x=>x.workspaceId===norm(b.workspaceId)&&x.content).map(x=>x.title+'\n'+x.content).join('\n').slice(0,9000);
   if(!knowledge&&!norm(b.offer))throw new Error('Cadastre a oferta ou conhecimento autorizado antes de gerar.');
   const prompt=['Crie um RASCUNHO de abordagem de prospecção, para revisão humana.','Empresa: '+s.workspace.name,'Nicho: '+(s.workspace.niche||''),'Canal: '+channel,'Objetivo: '+norm(b.objective),'Oferta validada: '+norm(b.offer),'Base autorizada: '+knowledge,'Regras: PT-BR, identifique a IA no canal voz, seja respeitoso, conciso, sem promessas, preços ou dados inventados. Respeite recusas; não presuma consentimento.','Devolva apenas o texto comercial.'].join('\n');
-  const response=await ai.generate({prompt,maxTokens:550,thinkingMode:'FAST'});
+  const response = await bridgeEnabled(s.ownerId)
+    ? await callBridge(s.ownerId, 'ai.draft', { prompt })
+    : await ai.generate({prompt,maxTokens:550,thinkingMode:'FAST'});
   await audit(s.ownerId,norm(b.workspaceId),'Rascunho comercial gerado por IA para revisão','ai');
   return {text:response.text,draft:true};
 }
@@ -308,6 +311,10 @@ async function cancelAppointment(c:Ctx){
   if(appointment.status==='cancelado')return {cancelled:true};
   const start=Date.parse(appointment.startAt),duration=Math.min(240,Math.max(15,Number(appointment.duration)||60));
   if(!Number.isFinite(start))throw new Error('Data inválida. Verificação manual necessária.');
+  if (appointment.googleSyncState === 'syncing' && Date.now() - Date.parse(appointment.googleSyncAt || '') < 120000) {
+    throw new Error('A sincronização com o Google está em andamento. Aguarde antes de cancelar.');
+  }
+  if (appointment.googleEventId) await callBridge(s.ownerId, 'calendar.cancel', { eventId: appointment.googleEventId });
   await patch(tab('appointments',s.ownerId),c.params.id,{status:'cancelado',cancelledAt:now()});
   const slots:string[]=[];
   for(let x=Math.floor(start/900000)*900000;x<start+duration*60000;x+=900000){
@@ -410,7 +417,167 @@ async function asaasCallback(c:Ctx){
   await audit(record.ownerId,record.workspaceId,'Recarga sandbox confirmada pelo provedor','billing');
   return json({credited:true,sandbox:true});
 }
+async function readIntelligence(c: Ctx) {
+  const s = await requireScope(c, 'read');
+  const workspaceId = norm(c.query.workspaceId);
+  const saved = await one(tab('intelligence', s.ownerId), 'studio_' + safe(workspaceId));
+  return { studio: saved || null };
+}
+
+async function saveIntelligence(c: Ctx) {
+  const s = await requireScope(c, 'edit');
+  const b = body(c);
+  const workspaceId = norm(b.workspaceId);
+  const requestId = norm(b.requestId);
+  if (!['email', 'whatsapp', 'voice'].includes(b.channel)) throw new Error('Escolha um canal válido.');
+  if (!requestId || requestId.length > 80) throw new Error('Identificação de salvamento inválida.');
+  const revision = Number(b.revision);
+  if (!Number.isSafeInteger(revision) || revision < 0) throw new Error('Versão inválida. Reabra a personalização.');
+  const fields = { objective: norm(b.objective), offer: norm(b.offer), content: norm(b.content) };
+  if (fields.objective.length > 1000 || fields.offer.length > 12000 || fields.content.length > 24000) {
+    throw new Error('O conteúdo excede o limite permitido.');
+  }
+  if (!fields.objective && !fields.offer && !fields.content) throw new Error('Preencha a personalização antes de salvar.');
+  const table = tab('intelligence', s.ownerId);
+  const key = 'studio_' + safe(workspaceId);
+  const previous = await one(table, key);
+  if (previous?.lastRequestId === requestId) {
+    if (previous.channel !== b.channel || Object.entries(fields).some(([key, value]) => previous[key] !== value)) {
+      throw new Error('Este identificador de salvamento já foi usado com outro conteúdo.');
+    }
+    return { studio: previous };
+  }
+  if ((previous?.revision || 0) !== revision) {
+    throw new Error('Esta personalização foi alterada em outra sessão. Preserve seu texto e reabra a aba para carregar a versão mais recente.');
+  }
+  const record = {
+    id: key, workspaceId, channel: b.channel, ...fields,
+    revision: revision + 1, lastRequestId: requestId, updatedAt: now(), updatedBy: user(c),
+  };
+  if (previous) {
+    await patch(table, key, record, { revision });
+  } else {
+    const [saved] = await db.tx.add(table, [record]);
+    if (!saved) throw new Error('Outra sessão salvou primeiro. Reabra a personalização antes de substituir.');
+  }
+  return { studio: record };
+}
+
+async function getBridgeStatus(c: Ctx) {
+  const s = await requireScope(c, 'read');
+  return bridgeStatus(s.ownerId, norm(c.query.workspaceId));
+}
+
+async function checkBridge(c: Ctx) {
+  const s = await requireScope(c, 'admin');
+  if (s.role !== 'owner') throw new Error('A conexão deve ser vinculada pelo proprietário da empresa.');
+  return testBridge(s.ownerId, norm(body(c).workspaceId), c.user!.email || '');
+}
+
+async function syncGoogleMeeting(c: Ctx) {
+  const s = await requireScope(c, 'edit');
+  const workspaceId = norm(body(c).workspaceId);
+  const appointmentId = norm(body(c).appointmentId);
+  const event = await one(tab('appointments', s.ownerId), appointmentId);
+  if (!event || event.workspaceId !== workspaceId || event.status === 'cancelado') {
+    throw new Error('Compromisso não encontrado ou cancelado.');
+  }
+  const eventId = ('salesos' + appointmentId).replace(/[^a-v0-9]/g, '').slice(0,100);
+  if (event.googleSyncState === 'syncing' && Date.now() - Date.parse(event.googleSyncAt || '') < 120000) {
+    throw new Error('Esta sincronização já está em andamento.');
+  }
+  if (!(await bridgeEnabled(s.ownerId))) throw new Error('Conecte o Google Calendar na aba Integrações.');
+  await patch(tab('appointments', s.ownerId), appointmentId, {
+    googleEventId: eventId, googleSyncState: 'syncing', googleSyncAt: now(),
+  }, { status: event.status, googleSyncState: event.googleSyncState });
+  try {
+    const result = await callBridge(s.ownerId, 'calendar.create', {
+      eventId, title: event.title, start: event.startAt,
+      end: new Date(Date.parse(event.startAt) + event.duration * 60000).toISOString(),
+    });
+    await patch(tab('appointments', s.ownerId), appointmentId, {
+      googleEventId: result.eventId, googleSyncState: 'confirmed',
+      meetUrl: result.meetUrl || '', calendarUrl: result.calendarUrl || '',
+    });
+    return { synced: true, meetUrl: result.meetUrl || '', calendarUrl: result.calendarUrl || '' };
+  } catch (e) {
+    await patch(tab('appointments', s.ownerId), appointmentId, { googleSyncState: 'uncertain' });
+    throw e;
+  }
+}
+
+async function syncBridgeInbox(c: Ctx) {
+  const s = await requireScope(c, 'edit');
+  const workspaceId = norm(body(c).workspaceId);
+  const cursorId = 'inbox_' + safe(workspaceId);
+  const cursorTable = tab('bridge_cursor', s.ownerId);
+  const previous = await one(cursorTable, cursorId);
+  const response = await callBridge(s.ownerId, 'inbox.pull', { cursor: previous?.cursor || '0' });
+  if (!Array.isArray(response.records) || response.records.length > 50) throw new Error('Página de conversas inválida.');
+  const leads = (await all(legacy('leads', s.ownerId), 300)).filter(l => l.workspaceId === workspaceId);
+  let imported = 0;
+  for (const record of response.records) {
+    if (!/^[0-9]{1,20}$/.test(String(record.id)) || !/^[0-9]{1,20}$/.test(String(record.contact_id))) {
+      throw new Error('Identificação de conversa inválida.');
+    }
+    if (!['email', 'whatsapp'].includes(record.channel) || !['inbound', 'outbound'].includes(record.direction)) {
+      throw new Error('Canal de conversa inválido.');
+    }
+    const email = norm(record.email).toLowerCase();
+    const number = phone(record.phone);
+    let lead = leads.find(l => (email && l.email === email) || (number && l.phone === number));
+    if (!lead) {
+      const leadId = 'n8n_' + safe(workspaceId) + '_' + record.contact_id;
+      const existing = await one(legacy('leads', s.ownerId), leadId);
+      lead = existing || {
+        id: leadId, workspaceId, name: norm(record.name) || email || number || 'Contato n8n',
+        email, phone: number, source: 'Conversa importada do n8n', legalBasis: '',
+        whatsappOptIn: false, voiceAllowed: false, optOut: record.suppressed === true,
+        status: record.suppressed ? 'bloqueado' : 'Novo', stage: 'Novo Lead', createdAt: now(),
+      };
+      if (!existing) await db.tx.add(legacy('leads', s.ownerId), [lead]);
+      leads.push(lead);
+    }
+    if (record.suppressed === true && !lead.optOut) {
+      await patch(legacy('leads', s.ownerId), lead.id, { optOut: true, status: 'bloqueado' });
+    }
+    const item = {
+      id: 'n8n_' + safe(workspaceId) + '_' + record.id, workspaceId, leadId: lead.id,
+      channel: record.channel, direction: record.direction, provider: norm(record.provider),
+      providerEventId: norm(record.provider_message_id), status: norm(record.status),
+      message: norm(record.content).slice(0,5000), at: norm(record.occurred_at),
+    };
+    const [saved] = await db.tx.add(tab('messages', s.ownerId), [item]);
+    if (saved) imported++;
+  }
+  const cursor = String(response.nextCursor || previous?.cursor || '0');
+  if (!/^[0-9]{1,20}$/.test(cursor)) throw new Error('Cursor recebido inválido.');
+  if (previous) await patch(cursorTable, cursorId, { cursor }, { cursor: previous.cursor });
+  else await db.tx.add(cursorTable, [{ id: cursorId, workspaceId, cursor }]);
+  return { imported, hasMore: response.hasMore === true };
+}
+
 export const salesOsRoutes:RouterRoutes={
+  'POST /api/salesos/n8n/inbox': [requireAuth(), async c => {
+    try { return json(await syncBridgeInbox(c)); } catch (e) { return respond(e); }
+  }],
+  'GET /api/salesos/n8n/status': [requireAuth(), async c => {
+    try { return json(await getBridgeStatus(c)); } catch (e) { return respond(e); }
+  }],
+  'POST /api/salesos/n8n/test': [requireAuth(), requireAdminEmailAllowlist(installationOwnerEmail ? [installationOwnerEmail] : []), async c => {
+    try { return json(await checkBridge(c)); } catch (e) { return respond(e); }
+  }],
+  'POST /api/salesos/calendar/sync': [requireAuth(), async c => {
+    try { return json(await syncGoogleMeeting(c)); } catch (e) { return respond(e); }
+  }],
+
+  'GET /api/salesos/intelligence': [requireAuth(), async c => {
+    try { return json(await readIntelligence(c)); } catch (e) { return respond(e); }
+  }],
+  'PUT /api/salesos/intelligence': [requireAuth(), async c => {
+    try { return json(await saveIntelligence(c)); } catch (e) { return respond(e); }
+  }],
+
   'GET /api/salesos/bootstrap':[requireAuth(),async c=>json(await bootstrap(user(c)))],
   'POST /api/salesos/records/:kind':[requireAuth(),async c=>{try{return json(await createGeneric(c));}catch(e){return respond(e);}}],
   'PUT /api/salesos/records/:kind/:id':[requireAuth(),async c=>{try{return json(await editGeneric(c));}catch(e){return respond(e);}}],

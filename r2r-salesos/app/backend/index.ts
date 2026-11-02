@@ -1,3 +1,4 @@
+import { bridgeEnabled, callBridge, n8nGatewayUrl } from './n8nBridge.ts';
 import { router, json, error, requireAuth, db, secrets } from './runtime.ts';
 import { salesOsRoutes } from './salesos.ts';
 
@@ -81,7 +82,7 @@ async function status() {
   const names = await secrets.listSecretNames();
   return {
     n8n:
-      names.includes('N8N_WEBHOOK_URL') && names.includes('N8N_WEBHOOK_TOKEN'),
+      names.includes('N8N_WEBHOOK_TOKEN'),
     email: names.includes('EMAIL_PROVIDER_KEY'),
     whatsapp: names.includes('WHATSAPP_ACCESS_TOKEN'),
     voice: names.includes('RETELL_API_KEY'),
@@ -107,13 +108,15 @@ async function dispatch(
   const c = clock();
   if (c.hour < 9 || c.hour >= 18 || ['Sat', 'Sun'].includes(c.day))
     throw new Error('Fora da janela comercial (seg-sex, 09h-18h).');
+  const usingBridge = await bridgeEnabled(uid);
+  if (usingBridge && channel === 'voice') throw new Error('O provedor de ligações ainda não está conectado.');
   const names = await secrets.listSecretNames();
   if (
-    !names.includes('N8N_WEBHOOK_URL') ||
+    (!usingBridge && !names.includes('N8N_WEBHOOK_URL')) ||
     !names.includes('N8N_WEBHOOK_TOKEN')
   )
     throw new Error('Configure o webhook seguro n8n para habilitar os envios.');
-  const urlString = await secrets.readSecret('N8N_WEBHOOK_URL');
+  const urlString = usingBridge ? n8nGatewayUrl : await secrets.readSecret('N8N_WEBHOOK_URL');
   const webhookToken = await secrets.readSecret('N8N_WEBHOOK_TOKEN');
   const url = new URL(urlString);
   if (
@@ -216,19 +219,32 @@ async function dispatch(
     },
   };
   try {
-    const response = await fetch(url.toString(), {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-SDR-Token': webhookToken,
-        'X-Idempotency-Key': receiptId,
-      },
-      body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(12000),
-    });
-    if (!response.ok) throw new Error('n8n retornou HTTP ' + response.status);
+    let provider: Item | undefined;
+    if (usingBridge) {
+      provider = await callBridge(uid, channel + '.send', payload);
+    } else {
+      const response = await fetch(url.toString(), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-SDR-Token': webhookToken,
+          'X-Idempotency-Key': receiptId,
+        },
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(12000),
+      });
+      if (!response.ok) throw new Error('n8n retornou HTTP ' + response.status);
+    }
     await updateOne('receipts', uid, receiptId, { status: 'accepted' });
     await updateOne('leads', uid, lead.id, { lastContactAt: date() });
+    if (usingBridge) {
+      await db.tx.add('salesos_messages_' + clean(uid), [{
+        id: 'bridge_' + receiptId, workspaceId: campaign.workspaceId, leadId: lead.id,
+        campaignId: campaign.id, channel, direction: 'outbound', status: 'requested',
+        message: payload.message, provider: 'n8n', providerEventId: provider?.providerId || '', at: date(),
+      }]);
+    }
+
     await log(uid, {
       title: 'Solicitação ' + channel + ' aceita pelo n8n',
       leadId: lead.id,

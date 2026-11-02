@@ -32,3 +32,14 @@ O agendamento de campanhas roda a cada minuto, com os controles de horário já 
 `pnpm install --frozen-lockfile`, `pnpm typecheck`, `pnpm test`, `pnpm build`.
 
 `GET /api/health` verifica a API e a conexão com o banco. Os testes de integração verificam autenticação, cadastro fechado, isolamento de dados, permissões, contatos, pipeline, arquivos assinados, convites, proteção de origem, logout e persistência após reiniciar. Há também testes de rollback, atualização condicional, incremento e paginação.
+
+
+## Conector com o n8n existente
+
+A versão atual tem um conector para IA local, Hostinger Mail, Evolution e Google Calendar/Meet. Configure `N8N_CONNECTION_OWNER_EMAIL` com o e-mail do administrador autorizado e `N8N_WEBHOOK_TOKEN` com o mesmo código protegido configurado na credencial Header Auth do webhook n8n. O workflow deve estar publicado em `/webhook/r2r-salesos/v1` na instância n8n autorizada.
+
+Em Integrações, clique Conectar e testar ferramentas para vincular o acesso à conta do proprietário. Outras contas não podem vincular ou usar as credenciais dessa instalação. Membros da mesma empresa seguem suas permissões de acesso. O teste é somente de leitura.
+
+Na agenda, o botão Criar Google Meet sincroniza um compromisso salvo. A criação usa ID fixo para reconciliar novas tentativas. Cancelar um compromisso sincronizado também solicita o cancelamento no Google antes de alterar o estado local. Os envios mantêm as verificações de elegibilidade, reserva e a habilitação de produção preexistentes.
+
+As contas de voz e de pagamentos ainda precisam ser identificadas e configuradas. O conector não declara esses serviços conectados. Mensagens recebidas dos workflows anteriores continuam na operação anterior até configurar os callbacks correspondentes.
