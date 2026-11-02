@@ -1,0 +1,1514 @@
+{
+  "name": "R2R_SALESOS_CONECTOR_SEGURO",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "r2r-salesos/v1",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "d4fe186f-ab05-475a-a6a7-6cbfc7795bc1",
+      "name": "SalesOS Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -432,
+        1264
+      ],
+      "webhookId": "990108b8-6b4e-4745-9b2c-24ddf5102935",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "kgi66PfhZzad3Rdp",
+          "name": "Header Auth account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const b = $('SalesOS Webhook').first().json.body || {};\nconst action = b.action || (b.event === 'sdr.outreach.requested' ? b.channel + '.send' : '');\nif (action !== 'health') return [];\n\nreturn [{json:b}];"
+      },
+      "id": "41f95251-06f3-49b2-9895-4a9bcb501729",
+      "name": "Diagnostico sem envios",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -192,
+        656
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://evolution-evolution-api.ke4n49.easypanel.host/instance/connectionState/R2R%20Marketing%20Digital",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          },
+          "timeout": 60000
+        }
+      },
+      "id": "2a864868-61cd-4781-87cd-6266e02339b9",
+      "name": "Verificar WhatsApp",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        48,
+        656
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "9fG5BhkwDuyoenQO",
+          "name": "R2R_COMERCIAL_EVOLUTION"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://api.mail.hostinger.com/api/v1/me",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          },
+          "timeout": 60000
+        }
+      },
+      "id": "7c2c697f-b034-46ec-94b4-70fcddb4aa22",
+      "name": "Verificar email",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        288,
+        656
+      ],
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "P5AsDmwLGBVdLOg6",
+          "name": "R2R_COMERCIAL_HOSTINGER_MAIL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://www.googleapis.com/calendar/v3/users/me/calendarList",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleCalendarOAuth2Api",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          },
+          "timeout": 60000
+        }
+      },
+      "id": "0ece137b-0e3f-439f-8c51-68a2fd2f2159",
+      "name": "Verificar Google Calendar",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        528,
+        656
+      ],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "7dK9a3aiMau7zPKM",
+          "name": "R2R_COMERCIAL_GOOGLE_CALENDAR"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "http://r2rmarketingdigital_r2r-comercial-ia:11434/api/tags",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          },
+          "timeout": 60000
+        }
+      },
+      "id": "d71013f1-74eb-4866-9278-fa24d91cacfb",
+      "name": "Verificar IA local",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        768,
+        656
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const read = name => $(name).first().json;\nconst ok = r => r.statusCode >= 200 && r.statusCode < 300;\nconst wa = read('Verificar WhatsApp');\nconst mail = read('Verificar email');\nconst calendar = read('Verificar Google Calendar');\nconst ai = read('Verificar IA local');\nreturn [{json:{ok:true,checkedAt:new Date().toISOString(),services:{\n whatsapp:ok(wa) && wa.body?.instance?.state === 'open',\n email:ok(mail), calendar:ok(calendar),\n ai:ok(ai) && (ai.body?.models || []).some(m => m.name === 'qwen3:1.7b')\n}}}];"
+      },
+      "id": "797b027a-d19b-4864-8ba5-2b64c4a25180",
+      "name": "Somente estado das conexoes",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1008,
+        656
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "842e84c3-8cb0-4599-bcc4-b148404e2f02",
+      "name": "Retornar diagnostico",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1248,
+        656
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const b = $('SalesOS Webhook').first().json.body || {};\nconst action = b.action || (b.event === 'sdr.outreach.requested' ? b.channel + '.send' : '');\nif (action !== 'ai.draft') return [];\nif (typeof b.prompt !== 'string' || !b.prompt.trim() || b.prompt.length > 16000) throw new Error('Contexto invalido.');\nif (!/^[a-f0-9]{32}$/.test(b.jobId || '')) throw new Error('Pedido invalido.');\nif (!['https://api-v2.appdeploy.ai/app/sdrflow-intelligence-1bxmzi/api/salesos/n8n/ai/result','https://r2rmarketingdigital-sdr.ke4n49.easypanel.host/api/salesos/n8n/ai/result'].includes(b.callbackUrl)) throw new Error('Destino invalido.');\nreturn [{json:b}];"
+      },
+      "id": "5c8a39fd-42d8-4997-b3a0-377f361a4c0a",
+      "name": "Validar rascunho IA",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -192,
+        960
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://r2rmarketingdigital_r2r-comercial-ia:11434/api/chat",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({model:'qwen3:1.7b',messages:[{role:'system',content:'Responda em portugues do Brasil. Entregue apenas um rascunho comercial para revisao humana. Nunca invente dados ou condicoes.'},{role:'user',content:$('Validar rascunho IA').first().json.prompt}],think:false,stream:false,options:{num_ctx:8192,num_predict:650,num_thread:2,temperature:0.3},keep_alive:'5m'}) }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          },
+          "timeout": 180000
+        }
+      },
+      "id": "08497616-062b-41ee-995c-b35c7f0f31c0",
+      "name": "Gerar rascunho local",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        720,
+        -300
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const b=$('Validar rascunho IA').first().json; const text=String($json.body?.message?.content || '').trim(); return [{json:{jobId:b.jobId,callbackUrl:b.callbackUrl,success:$json.statusCode===200 && !!text,text:text.slice(0,24000)}}];"
+      },
+      "id": "e39c3981-5d37-437b-9d14-41303e1d4c57",
+      "name": "Validar texto gerado",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        -300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {ok:true,queued:true,jobId:$json.jobId} }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "563d791f-5758-4dc6-b9b9-21d38de03244",
+      "name": "Confirmar fila IA",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        480,
+        -300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const b = $('SalesOS Webhook').first().json.body || {};\nconst action = b.action || (b.event === 'sdr.outreach.requested' ? b.channel + '.send' : '');\nif (action !== 'email.send') return [];\nif (!/^[A-Za-z0-9_:-]{8,150}$/.test(b.idempotency_key || '')) throw new Error('Identificador invalido.');\nif (b.controls?.opt_out !== false || !['consent','legitimate_interest_assessed','contractual'].includes(b.lead?.legal_basis)) throw new Error('Contato sem elegibilidade.');\nif (typeof b.message !== 'string' || !b.message.trim() || b.message.length > 10000) throw new Error('Mensagem invalida.');\nif (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(b.lead?.email || '')) throw new Error('Email invalido.');\nreturn [{json:b}];"
+      },
+      "id": "102d44ce-4244-452b-99f7-6532628cb883",
+      "name": "Validar envio email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -192,
+        1264
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "CREATE TABLE IF NOT EXISTS r2r_comercial.salesos_bridge_receipts (id text PRIMARY KEY, channel text NOT NULL, status text NOT NULL, created_at timestamptz NOT NULL DEFAULT now()); WITH inserted AS (INSERT INTO r2r_comercial.salesos_bridge_receipts(id,channel,status) VALUES($1,$2,'reserved') ON CONFLICT DO NOTHING RETURNING id) SELECT EXISTS(SELECT 1 FROM inserted) AS reserved;",
+        "options": {
+          "queryReplacement": "={{ [$json.idempotency_key, 'email'] }}"
+        }
+      },
+      "id": "cd60cb35-9ba9-4314-aa6e-21cceb2ca30a",
+      "name": "Reservar email",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        48,
+        1264
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "xAPRYMZPApLSCINA",
+          "name": "R2R_COMERCIAL_POSTGRES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "if ($json.reserved !== true) return []; return [{json:$('Validar envio email').first().json}];"
+      },
+      "id": "147b46d0-b92e-443a-a897-49e22db41f8e",
+      "name": "Enviar somente reserva nova email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        288,
+        1264
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "if ($json.reserved !== false) return []; return [{json:{ok:false,error:'Solicitacao ja reservada. Confira o provedor antes de repetir.'}}];"
+      },
+      "id": "404912cb-a4c3-4b43-8eee-06b68e8f92c4",
+      "name": "Detectar repeticao email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        288,
+        1376
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseCode": 409
+        }
+      },
+      "id": "178a2252-c59f-4ea7-b061-cfa9101bfe06",
+      "name": "Recusar repeticao email",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        528,
+        1376
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.mail.hostinger.com/api/v1/mailboxes/ACd9be1de2c63107b6b0b92d926b3c/send",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({to:[$json.lead.email],displayName:'Equipe Comercial R2R Marketing Digital',subject:$json.campaign?.title || 'R2R Marketing Digital',text:$json.message}) }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          },
+          "timeout": 60000
+        }
+      },
+      "id": "9af94c70-a543-4898-bacc-3b93ef4e1f64",
+      "name": "Enviar email Hostinger",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        528,
+        1264
+      ],
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "P5AsDmwLGBVdLOg6",
+          "name": "R2R_COMERCIAL_HOSTINGER_MAIL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "if ($json.statusCode < 200 || $json.statusCode >= 300) throw new Error('Provedor nao confirmou o envio. Reconciliar sem reenviar.'); return [{json:{ok:true,accepted:true,providerId:String($json.body?.key?.id || $json.body?.data?.id || $json.body?.id || ''),status:'accepted'}}];"
+      },
+      "id": "b2eff8da-b964-4180-9655-ea6fd1de3999",
+      "name": "Confirmar aceite email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        768,
+        1264
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "df69db23-e1a9-447b-8eec-69085f0505da",
+      "name": "Retornar aceite email",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1008,
+        1264
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const b = $('SalesOS Webhook').first().json.body || {};\nconst action = b.action || (b.event === 'sdr.outreach.requested' ? b.channel + '.send' : '');\nif (action !== 'whatsapp.send') return [];\nif (!/^[A-Za-z0-9_:-]{8,150}$/.test(b.idempotency_key || '')) throw new Error('Identificador invalido.');\nif (b.controls?.opt_out !== false || !['consent','legitimate_interest_assessed','contractual'].includes(b.lead?.legal_basis)) throw new Error('Contato sem elegibilidade.');\nif (typeof b.message !== 'string' || !b.message.trim() || b.message.length > 10000) throw new Error('Mensagem invalida.');\nif (b.controls?.whatsapp_opt_in !== true || !/^55[0-9]{10,11}$/.test(b.lead?.phone || '')) throw new Error('WhatsApp sem opt-in ou numero invalido.');\nreturn [{json:b}];"
+      },
+      "id": "cf3b1e9d-f8b6-4b0a-92f0-2bba2168d12b",
+      "name": "Validar envio whatsapp",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -192,
+        1568
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "CREATE TABLE IF NOT EXISTS r2r_comercial.salesos_bridge_receipts (id text PRIMARY KEY, channel text NOT NULL, status text NOT NULL, created_at timestamptz NOT NULL DEFAULT now()); WITH inserted AS (INSERT INTO r2r_comercial.salesos_bridge_receipts(id,channel,status) VALUES($1,$2,'reserved') ON CONFLICT DO NOTHING RETURNING id) SELECT EXISTS(SELECT 1 FROM inserted) AS reserved;",
+        "options": {
+          "queryReplacement": "={{ [$json.idempotency_key, 'whatsapp'] }}"
+        }
+      },
+      "id": "c3ab5359-c674-420b-9e25-817b2a7c9b6c",
+      "name": "Reservar whatsapp",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        48,
+        1568
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "xAPRYMZPApLSCINA",
+          "name": "R2R_COMERCIAL_POSTGRES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "if ($json.reserved !== true) return []; return [{json:$('Validar envio whatsapp').first().json}];"
+      },
+      "id": "3211a561-ac37-4c13-8c85-a7878e6a7435",
+      "name": "Enviar somente reserva nova whatsapp",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        288,
+        1568
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "if ($json.reserved !== false) return []; return [{json:{ok:false,error:'Solicitacao ja reservada. Confira o provedor antes de repetir.'}}];"
+      },
+      "id": "12731fe0-3997-49a5-9298-0555607bf1e8",
+      "name": "Detectar repeticao whatsapp",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        288,
+        1680
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseCode": 409
+        }
+      },
+      "id": "3fff3d89-393d-41a0-b445-9e901c70215f",
+      "name": "Recusar repeticao whatsapp",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        528,
+        1680
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://evolution-evolution-api.ke4n49.easypanel.host/message/sendText/R2R%20Marketing%20Digital",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({number:$json.lead.phone,text:$json.message}) }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          },
+          "timeout": 60000
+        }
+      },
+      "id": "9f9cd916-95ec-42c8-b39a-f8202cfbd318",
+      "name": "Enviar WhatsApp Evolution",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        528,
+        1568
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "9fG5BhkwDuyoenQO",
+          "name": "R2R_COMERCIAL_EVOLUTION"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "if ($json.statusCode < 200 || $json.statusCode >= 300) throw new Error('Provedor nao confirmou o envio. Reconciliar sem reenviar.'); return [{json:{ok:true,accepted:true,providerId:String($json.body?.key?.id || $json.body?.data?.id || $json.body?.id || ''),status:'accepted'}}];"
+      },
+      "id": "dd29f109-51cd-4be9-8774-01ce0f21f594",
+      "name": "Confirmar aceite whatsapp",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        768,
+        1568
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "31a3d562-7914-4bd6-8336-7407705e9784",
+      "name": "Retornar aceite whatsapp",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1008,
+        1568
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const b = $('SalesOS Webhook').first().json.body || {};\nconst action = b.action || (b.event === 'sdr.outreach.requested' ? b.channel + '.send' : '');\nif (action !== 'calendar.create') return [];\nif (!/^[a-v0-9]{8,100}$/.test(b.eventId || '')) throw new Error('Evento invalido.');\nif (!Number.isFinite(Date.parse(b.start)) || !Number.isFinite(Date.parse(b.end)) || Date.parse(b.end) <= Date.parse(b.start)) throw new Error('Datas invalidas.');\nif (typeof b.title !== 'string' || !b.title.trim()) throw new Error('Titulo obrigatorio.');\nreturn [{json:b}];"
+      },
+      "id": "d3bfcf7a-6bfd-4ce5-a455-fd62f7290856",
+      "name": "Validar criacao Google Meet",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -192,
+        1920
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ 'https://www.googleapis.com/calendar/v3/calendars/primary/events/' + $json.eventId }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleCalendarOAuth2Api",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          },
+          "timeout": 60000
+        }
+      },
+      "id": "ca548136-4b60-4dfb-a6f8-c116dae98a83",
+      "name": "Consultar evento pelo ID",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        48,
+        1920
+      ],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "7dK9a3aiMau7zPKM",
+          "name": "R2R_COMERCIAL_GOOGLE_CALENDAR"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "if ($json.statusCode === 200) return []; if ($json.statusCode !== 404) throw new Error('Nao foi possivel verificar o calendario.'); return [{json:$('Validar criacao Google Meet').first().json}];"
+      },
+      "id": "75c5792d-c159-4882-bb13-06e42ca2af87",
+      "name": "Criar somente evento ausente",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        288,
+        1920
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "if ($json.statusCode !== 200) return []; const e=$json.body,b=$('Validar criacao Google Meet').first().json; if (Date.parse(e.start?.dateTime) !== Date.parse(b.start) || Date.parse(e.end?.dateTime) !== Date.parse(b.end) || e.summary !== b.title) throw new Error('Evento existente com dados diferentes.'); return [{json:{ok:true,eventId:e.id,meetUrl:e.hangoutLink || e.conferenceData?.entryPoints?.find(p=>p.entryPointType==='video')?.uri || '',calendarUrl:e.htmlLink || ''}}];"
+      },
+      "id": "30209db2-dea5-432c-a482-2d53f3774db4",
+      "name": "Reconciliar evento existente",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        288,
+        2064
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "9e184a27-8282-435b-a2c1-7b6e3935684c",
+      "name": "Retornar evento reconciliado",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        528,
+        2064
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://www.googleapis.com/calendar/v3/freeBusy",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleCalendarOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({timeMin:$json.start,timeMax:$json.end,items:[{id:'primary'}]}) }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          },
+          "timeout": 60000
+        }
+      },
+      "id": "0135b74a-5fdf-4f9c-8b57-da6aca4f1d3b",
+      "name": "Conferir disponibilidade Google",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        528,
+        1920
+      ],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "7dK9a3aiMau7zPKM",
+          "name": "R2R_COMERCIAL_GOOGLE_CALENDAR"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "if ($json.statusCode !== 200 || !$json.body?.calendars?.primary || $json.body.calendars.primary.errors?.length || $json.body.calendars.primary.busy?.length) throw new Error('Horario indisponivel no Google Calendar.'); return [{json:$('Validar criacao Google Meet').first().json}];"
+      },
+      "id": "c21d987e-b051-475b-ac3b-33c092d23d14",
+      "name": "Exigir horario livre",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        768,
+        1920
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://www.googleapis.com/calendar/v3/calendars/primary/events?conferenceDataVersion=1&sendUpdates=none",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleCalendarOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          },
+          "timeout": 60000
+        }
+      },
+      "id": "f70b6b56-50ca-49d9-a627-0e72750254fa",
+      "name": "Criar evento e Google Meet",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1008,
+        1920
+      ],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "7dK9a3aiMau7zPKM",
+          "name": "R2R_COMERCIAL_GOOGLE_CALENDAR"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "if (!($json.statusCode >= 200 && $json.statusCode < 300) && $json.statusCode !== 409) throw new Error('Google nao confirmou o evento. Reconciliar pelo ID.'); return [{json:$('Validar criacao Google Meet').first().json}];"
+      },
+      "id": "1f947327-3074-4f54-8ccb-72fd772e2574",
+      "name": "Validar criacao do evento",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1248,
+        1920
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ 'https://www.googleapis.com/calendar/v3/calendars/primary/events/' + $json.eventId }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleCalendarOAuth2Api",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          },
+          "timeout": 60000
+        }
+      },
+      "id": "61398285-05dd-425c-8c9c-ebe50fe26c82",
+      "name": "Ler evento confirmado",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1488,
+        1920
+      ],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "7dK9a3aiMau7zPKM",
+          "name": "R2R_COMERCIAL_GOOGLE_CALENDAR"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "if ($json.statusCode !== 200 || !$json.body?.id) throw new Error('Evento ainda nao confirmado.'); const e=$json.body; return [{json:{ok:true,eventId:e.id,meetUrl:e.hangoutLink || e.conferenceData?.entryPoints?.find(p=>p.entryPointType==='video')?.uri || '',calendarUrl:e.htmlLink || ''}}];"
+      },
+      "id": "efbf88ea-4cb7-4720-911a-cdb9ba74d52c",
+      "name": "Retornar evento confirmado",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1728,
+        1920
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "495b68e2-c8da-4f72-8d62-8d8394b44111",
+      "name": "Retornar Google Meet",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1968,
+        1920
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const b = $('SalesOS Webhook').first().json.body || {};\nconst action = b.action || (b.event === 'sdr.outreach.requested' ? b.channel + '.send' : '');\nif (action !== 'calendar.cancel') return [];\nif (!/^[a-v0-9]{8,100}$/.test(b.eventId || '')) throw new Error('Evento invalido.');\nreturn [{json:b}];"
+      },
+      "id": "4acfebe9-b453-49d0-b376-19312d5f599b",
+      "name": "Validar cancelamento Google",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -192,
+        2320
+      ]
+    },
+    {
+      "parameters": {
+        "method": "DELETE",
+        "url": "={{ 'https://www.googleapis.com/calendar/v3/calendars/primary/events/' + $json.eventId + '?sendUpdates=none' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleCalendarOAuth2Api",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          },
+          "timeout": 60000
+        }
+      },
+      "id": "25ed7143-92e1-4e57-af44-d323138c9727",
+      "name": "Cancelar somente evento solicitado",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        48,
+        2320
+      ],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "7dK9a3aiMau7zPKM",
+          "name": "R2R_COMERCIAL_GOOGLE_CALENDAR"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "if (![200,204,404,410].includes($json.statusCode)) throw new Error('Cancelamento nao confirmado.'); return [{json:{ok:true,cancelled:true}}];"
+      },
+      "id": "56e22671-1de3-48a8-aef0-a7355e629c7c",
+      "name": "Confirmar cancelamento",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        288,
+        2320
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "30d87202-7e2a-40b2-b9da-5b86bbd490cc",
+      "name": "Retornar cancelamento",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        528,
+        2320
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const b = $('SalesOS Webhook').first().json.body || {};\nconst action = b.action || (b.event === 'sdr.outreach.requested' ? b.channel + '.send' : '');\nif (action !== 'inbox.pull') return [];\nif (!/^[0-9]{1,20}$/.test(String(b.cursor || '0'))) throw new Error('Cursor invalido.');\nreturn [{json:b}];"
+      },
+      "id": "9d98ee7a-7715-4fc3-8413-a02c9483412a",
+      "name": "Validar sincronizacao de conversas",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -192,
+        2512
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT m.id::text AS id, m.content, m.direction, m.provider, m.provider_message_id, m.status, m.occurred_at,\n v.channel, c.id::text AS contact_id, c.name, c.email, c.phone,\n EXISTS(SELECT 1 FROM r2r_comercial.suppressions x WHERE x.identifier IN(c.email,c.phone)) AS suppressed\n FROM r2r_comercial.messages m\n JOIN r2r_comercial.conversations v ON v.id=m.conversation_id\n JOIN r2r_comercial.contacts c ON c.id=v.contact_id\n WHERE m.id > $1::bigint AND m.occurred_at > now()-interval '7 days'\n ORDER BY m.id ASC LIMIT 50;",
+        "options": {
+          "queryReplacement": "={{ [String($json.cursor || '0')] }}"
+        }
+      },
+      "id": "d2c933c0-e334-42b9-acd6-f783e2b29f4b",
+      "name": "Ler pagina de conversas R2R",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        48,
+        2512
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "xAPRYMZPApLSCINA",
+          "name": "R2R_COMERCIAL_POSTGRES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const records=$input.all().map(i=>i.json).filter(r=>r.id).map(r=>({...r,content:String(r.content || '').slice(0,5000)})); return [{json:{ok:true,records,nextCursor:records.at(-1)?.id || String($('Validar sincronizacao de conversas').first().json.cursor || '0'),hasMore:records.length===50}}];"
+      },
+      "id": "0decc38c-9d74-4158-97d8-03166fbdc4a1",
+      "name": "Entregar pagina limitada",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        288,
+        2512
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "3aa0aae5-632f-4b5f-b94f-67c40cdf0197",
+      "name": "Retornar conversas",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        528,
+        2512
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const b = $('SalesOS Webhook').first().json.body || {};\nconst action = b.action || (b.event === 'sdr.outreach.requested' ? b.channel + '.send' : '');\nif (['health','ai.draft','email.send','whatsapp.send','calendar.create','calendar.cancel','inbox.pull'].includes(action)) return []; return [{json:{ok:false,error:'Acao nao disponivel neste conector.'}}];"
+      },
+      "id": "2e632579-5cb2-44f6-b7fe-85c6381a69a3",
+      "name": "Recusar acao desconhecida",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -192,
+        2608
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "f906061c-6987-48bf-962a-99aa111adc7e",
+      "name": "Retornar acao indisponivel",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        48,
+        2608
+      ]
+    },
+    {
+      "id": "9eaf47aa-7cc6-4586-8270-e6a7e9a46b5d",
+      "name": "Entregar resultado IA ao SalesOS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1200,
+        -300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.callbackUrl }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({jobId:$json.jobId,success:$json.success,text:$json.text}) }}",
+        "options": {
+          "timeout": 25000
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "kgi66PfhZzad3Rdp",
+          "name": "Header Auth account 3"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "id": "df5d62fc-5540-49a4-bfe4-ed957b0a4ef2",
+      "name": "Preparar dados do evento Google",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        650
+      ],
+      "parameters": {
+        "jsCode": "const b=$json; return [{json:{id:b.eventId,summary:b.title,start:{dateTime:b.start,timeZone:'America/Sao_Paulo'},end:{dateTime:b.end,timeZone:'America/Sao_Paulo'},conferenceData:{createRequest:{requestId:b.eventId,conferenceSolutionKey:{type:'hangoutsMeet'}}}}}];"
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "SalesOS Webhook": {
+      "main": [
+        [
+          {
+            "node": "Diagnostico sem envios",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Validar rascunho IA",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Validar envio email",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Validar envio whatsapp",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Validar criacao Google Meet",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Validar cancelamento Google",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Validar sincronizacao de conversas",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Recusar acao desconhecida",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Diagnostico sem envios": {
+      "main": [
+        [
+          {
+            "node": "Verificar WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verificar WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "Verificar email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verificar email": {
+      "main": [
+        [
+          {
+            "node": "Verificar Google Calendar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verificar Google Calendar": {
+      "main": [
+        [
+          {
+            "node": "Verificar IA local",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verificar IA local": {
+      "main": [
+        [
+          {
+            "node": "Somente estado das conexoes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Somente estado das conexoes": {
+      "main": [
+        [
+          {
+            "node": "Retornar diagnostico",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar rascunho IA": {
+      "main": [
+        [
+          {
+            "node": "Confirmar fila IA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gerar rascunho local": {
+      "main": [
+        [
+          {
+            "node": "Validar texto gerado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar texto gerado": {
+      "main": [
+        [
+          {
+            "node": "Entregar resultado IA ao SalesOS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar envio email": {
+      "main": [
+        [
+          {
+            "node": "Reservar email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reservar email": {
+      "main": [
+        [
+          {
+            "node": "Enviar somente reserva nova email",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Detectar repeticao email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Detectar repeticao email": {
+      "main": [
+        [
+          {
+            "node": "Recusar repeticao email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar somente reserva nova email": {
+      "main": [
+        [
+          {
+            "node": "Enviar email Hostinger",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar email Hostinger": {
+      "main": [
+        [
+          {
+            "node": "Confirmar aceite email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Confirmar aceite email": {
+      "main": [
+        [
+          {
+            "node": "Retornar aceite email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar envio whatsapp": {
+      "main": [
+        [
+          {
+            "node": "Reservar whatsapp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reservar whatsapp": {
+      "main": [
+        [
+          {
+            "node": "Enviar somente reserva nova whatsapp",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Detectar repeticao whatsapp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Detectar repeticao whatsapp": {
+      "main": [
+        [
+          {
+            "node": "Recusar repeticao whatsapp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar somente reserva nova whatsapp": {
+      "main": [
+        [
+          {
+            "node": "Enviar WhatsApp Evolution",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar WhatsApp Evolution": {
+      "main": [
+        [
+          {
+            "node": "Confirmar aceite whatsapp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Confirmar aceite whatsapp": {
+      "main": [
+        [
+          {
+            "node": "Retornar aceite whatsapp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar criacao Google Meet": {
+      "main": [
+        [
+          {
+            "node": "Consultar evento pelo ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consultar evento pelo ID": {
+      "main": [
+        [
+          {
+            "node": "Criar somente evento ausente",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Reconciliar evento existente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reconciliar evento existente": {
+      "main": [
+        [
+          {
+            "node": "Retornar evento reconciliado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Criar somente evento ausente": {
+      "main": [
+        [
+          {
+            "node": "Conferir disponibilidade Google",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Conferir disponibilidade Google": {
+      "main": [
+        [
+          {
+            "node": "Exigir horario livre",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Exigir horario livre": {
+      "main": [
+        [
+          {
+            "node": "Preparar dados do evento Google",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Criar evento e Google Meet": {
+      "main": [
+        [
+          {
+            "node": "Validar criacao do evento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar criacao do evento": {
+      "main": [
+        [
+          {
+            "node": "Ler evento confirmado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ler evento confirmado": {
+      "main": [
+        [
+          {
+            "node": "Retornar evento confirmado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retornar evento confirmado": {
+      "main": [
+        [
+          {
+            "node": "Retornar Google Meet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar cancelamento Google": {
+      "main": [
+        [
+          {
+            "node": "Cancelar somente evento solicitado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cancelar somente evento solicitado": {
+      "main": [
+        [
+          {
+            "node": "Confirmar cancelamento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Confirmar cancelamento": {
+      "main": [
+        [
+          {
+            "node": "Retornar cancelamento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar sincronizacao de conversas": {
+      "main": [
+        [
+          {
+            "node": "Ler pagina de conversas R2R",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ler pagina de conversas R2R": {
+      "main": [
+        [
+          {
+            "node": "Entregar pagina limitada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Entregar pagina limitada": {
+      "main": [
+        [
+          {
+            "node": "Retornar conversas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recusar acao desconhecida": {
+      "main": [
+        [
+          {
+            "node": "Retornar acao indisponivel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Confirmar fila IA": {
+      "main": [
+        [
+          {
+            "node": "Gerar rascunho local",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar dados do evento Google": {
+      "main": [
+        [
+          {
+            "node": "Criar evento e Google Meet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "none",
+    "saveManualExecutions": false
+  },
+  "versionId": "e5934b32-1ad6-4274-9b4a-a85929f61d77",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "fa297a9bc5bb936cae441360c00a930a89bf9bd06166da738d038384e7e4ac9a"
+  },
+  "id": "mVjd2aMAsGomIGlS",
+  "tags": []
+}
