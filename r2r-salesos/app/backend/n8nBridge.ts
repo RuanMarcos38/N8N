@@ -58,7 +58,7 @@ export async function bridgeStatus(ownerId: string, workspaceId: string) {
       { key: 'email', name: 'E-mail Hostinger', connected: health?.services?.email === true },
       { key: 'whatsapp', name: 'WhatsApp Evolution', connected: health?.services?.whatsapp === true },
       { key: 'calendar', name: 'Google Calendar e Meet', connected: health?.services?.calendar === true },
-      { key: 'voice', name: 'Ligações IA', connected: false, missing: 'Conta e provedor de voz ainda não identificados.' },
+      { key: 'voice', name: 'Ligações IA — Vapi', connected: false, missing: health?.voiceReason || (names.includes('VAPI_API_KEY') ? 'Vapi cadastrada. Teste o acesso e importe um número de origem para ligações.' : 'Cadastre a conexão Vapi e um número de origem.') },
       { key: 'payments', name: 'Pagamentos', connected: false, missing: 'Conta e provedor de pagamentos ainda não identificados.' },
     ],
   };
@@ -67,7 +67,8 @@ export async function bridgeStatus(ownerId: string, workspaceId: string) {
 export async function testBridge(ownerId: string, workspaceId: string, email: string) {
   await bindConnectionOwner(ownerId, email);
   const result = await callBridge(ownerId, 'health');
-  const item = { id: workspaceId, ownerId, checkedAt: new Date().toISOString(), services: result.services };
+  const voice = await testVapiConnection();
+  const item = { id: workspaceId, ownerId, checkedAt: new Date().toISOString(), services: result.services, voiceReason: voice.message, vapiVerified: voice.verified };
   const [previous] = await db.get<RecordValue>('salesos_bridge_status', [workspaceId], { consistent: true });
   if (previous) {
     if (previous.ownerId !== ownerId) throw new Error('Conexão indisponível para esta empresa.');
@@ -76,4 +77,29 @@ export async function testBridge(ownerId: string, workspaceId: string, email: st
     await db.tx.add('salesos_bridge_status', [item]);
   }
   return bridgeStatus(ownerId, workspaceId);
+}
+
+export async function testVapiConnection() {
+  const names = await secrets.listSecretNames();
+  if (!names.includes('VAPI_API_KEY') || !names.includes('VAPI_ASSISTANT_ID')) {
+    return { verified: false, message: 'Cadastre a chave privada e o assistente Vapi.' };
+  }
+  const assistantId = await secrets.readSecret('VAPI_ASSISTANT_ID');
+  if (!/^[a-f0-9-]{36}$/i.test(assistantId)) {
+    return { verified: false, message: 'Identificador do assistente Vapi inválido.' };
+  }
+  try {
+    const response = await fetch('https://api.vapi.ai/assistant/' + assistantId, {
+      headers: { Authorization: 'Bearer ' + await secrets.readSecret('VAPI_API_KEY') },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!response.ok) return { verified: false, message: 'Acesso Vapi não confirmado (HTTP ' + response.status + '). Verifique a chave e o assistente.' };
+    const assistant = await response.json() as RecordValue;
+    if (assistant.id !== assistantId) return { verified: false, message: 'O assistente Vapi não foi confirmado nesta conta.' };
+    return { verified: true, message: names.includes('VAPI_PHONE_NUMBER_ID')
+      ? 'Acesso Vapi e assistente verificados. O número de origem ainda precisa ser homologado antes das ligações.'
+      : 'Acesso Vapi e assistente verificados. Falta importar um número de origem de uma operadora para realizar ligações.' };
+  } catch {
+    return { verified: false, message: 'A Vapi não respondeu ao teste de acesso. Tente novamente.' };
+  }
 }

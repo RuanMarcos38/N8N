@@ -82,6 +82,13 @@ test('atomic reservations rollback, conditional updates, pagination and incremen
    assert.equal(status.services.filter(s=>s.connected).length,4);
    assert.equal(JSON.stringify(status).includes(process.env.N8N_WEBHOOK_TOKEN!),false);
    await assert.rejects(bridge.callBridge('other-owner','health'));
+   process.env.VAPI_API_KEY='test-only-vapi-key';
+   process.env.VAPI_ASSISTANT_ID='3b45842c-bcb5-4691-a288-4f0dc2113712';
+   globalThis.fetch=async(input,init)=>{assert.equal(String(input),'https://api.vapi.ai/assistant/'+process.env.VAPI_ASSISTANT_ID);assert.equal((init?.headers as any).Authorization,'Bearer test-only-vapi-key');return new Response(JSON.stringify({id:process.env.VAPI_ASSISTANT_ID}),{status:200});};
+   const voice=await bridge.testVapiConnection();assert.equal(voice.verified,true);assert.match(voice.message,/Falta importar/);assert.equal(JSON.stringify(voice).includes('test-only-vapi-key'),false);
+   globalThis.fetch=async()=>new Response('{}',{status:401});assert.equal((await bridge.testVapiConnection()).verified,false);
+   delete process.env.VAPI_API_KEY;delete process.env.VAPI_ASSISTANT_ID;
+
    const {salesOsRoutes}=await import('../backend/salesos.ts');
    await db.add('sdr_workspaces_realowner',[{id:'async-ws',name:'Async test'}]);
    const ctx:any={user:{userId:'real-owner'},body:{workspaceId:'async-ws',offer:'Oferta verificada',requestId:'a'.repeat(32)},params:{},query:{workspaceId:'async-ws'},event:{headers:{}}};
