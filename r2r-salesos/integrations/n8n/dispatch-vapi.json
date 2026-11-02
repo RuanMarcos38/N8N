@@ -1,0 +1,261 @@
+{
+  "name": "R2R SalesOS | Roteador multicanal | Vapi",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "sdrflow-outreach-2026",
+        "authentication": "headerAuth",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "00000000-0000-4000-8000-000000000001",
+      "name": "01 · Entrada segura SDRFlow",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        220,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const raw=$input.first().json.body??{};\nif(raw.event!=='sdr.outreach.requested')throw Error('Evento inválido');\nif(!['email','whatsapp','voice'].includes(raw.channel))throw Error('Canal inválido');\nif(!raw.idempotency_key||!raw.lead||!raw.campaign)throw Error('Campos ausentes');\nif(raw.controls?.opt_out===true)throw Error('Opt-out');\nif(!['consent','legitimate_interest_assessed','contractual'].includes(raw.lead.legal_basis))throw Error('Base legal inválida');\nif(!raw.lead.source)throw Error('Origem sem registro');\nif(raw.channel==='email'&&!/^\\S+@\\S+\\.\\S+$/.test(raw.lead.email||''))throw Error('E-mail inválido');\nif(raw.channel==='whatsapp'&&(raw.controls?.whatsapp_opt_in!==true||!raw.campaign.whatsapp_template))throw Error('WhatsApp sem opt-in/template');\nif(raw.channel==='voice'&&raw.controls?.voice_allowed!==true)throw Error('Voz não permitida');\nif(['voice','whatsapp'].includes(raw.channel)&&!/^55\\d{10,11}$/.test(raw.lead.phone||''))throw Error('Telefone inválido');\nreturn [{json:raw}];"
+      },
+      "id": "00000000-0000-4000-8000-000000000002",
+      "name": "02 · Validar elegibilidade",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        490,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.channel }}",
+                    "rightValue": "email",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "E-mail"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.channel }}",
+                    "rightValue": "whatsapp",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "WhatsApp"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.channel }}",
+                    "rightValue": "voice",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Voz"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "00000000-0000-4000-8000-000000000003",
+      "name": "03 · Distribuir por canal",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        760,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "fromEmail": "contato@SEU-DOMINIO.com.br",
+        "toEmail": "={{ $json.lead.email }}",
+        "subject": "={{ $json.campaign.title }}",
+        "emailFormat": "text",
+        "text": "={{ $json.message + '\\n\\nPara descadastro responda DESCADASTRAR.' }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "00000000-0000-4000-8000-000000000004",
+      "name": "04A · Enviar e-mail via SMTP",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1110,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v25.0/SEU_PHONE_NUMBER_ID/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ messaging_product:'whatsapp',to:$json.lead.phone,type:'template',template:{name:$json.campaign.whatsapp_template,language:{code:$json.campaign.whatsapp_language||'pt_BR'}} }) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "00000000-0000-4000-8000-000000000005",
+      "name": "04B · WhatsApp Cloud API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1110,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.vapi.ai/call",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ assistantId:'PREENCHA_ASSISTANT_ID_VAPI',phoneNumberId:'PREENCHA_PHONE_NUMBER_ID_VAPI',customer:{number:'+'+$json.lead.phone,name:$json.lead.name},metadata:{owner_id:$json.owner_id,workspace_id:$json.workspace_id,lead_id:$json.lead_id,campaign_id:$json.campaign_id,idempotency_key:$json.idempotency_key} }) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "00000000-0000-4000-8000-000000000006",
+      "name": "04C · Ligação IA — Vapi",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1110,
+        500
+      ]
+    }
+  ],
+  "connections": {
+    "01 · Entrada segura SDRFlow": {
+      "main": [
+        [
+          {
+            "node": "02 · Validar elegibilidade",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "02 · Validar elegibilidade": {
+      "main": [
+        [
+          {
+            "node": "03 · Distribuir por canal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "03 · Distribuir por canal": {
+      "main": [
+        [
+          {
+            "node": "04A · Enviar e-mail via SMTP",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "04B · WhatsApp Cloud API",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "04C · Ligação IA — Vapi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true
+  },
+  "active": false,
+  "pinData": {},
+  "tags": []
+}

@@ -1,0 +1,8 @@
+[
+  {
+    "name": "dispatch-sdr",
+    "cron": "*/5 * * * *",
+    "handler": "dispatchCron",
+    "timezone": "America/Sao_Paulo"
+  }
+]

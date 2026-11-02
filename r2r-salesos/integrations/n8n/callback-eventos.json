@@ -1,0 +1,96 @@
+{
+  "name": "R2R SalesOS | Callback de status normalizado",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "r2r-salesos-events-v1",
+        "authentication": "headerAuth",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "00000000-0000-4000-8000-000000000007",
+      "name": "A · Webhook eventos normalizados",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        220,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const e=$input.first().json.body||{};\nif(!['requested','queued','sent','delivered','read','replied','failed','call_started','call_answered','call_ended','qualified','opt_out'].includes(e.kind))throw Error('Status inválido');\nfor(const k of ['owner_id','workspace_id','event_id','lead_id'])if(typeof e[k]!=='string'||!e[k])throw Error('Campo ausente: '+k);\nif(!['email','whatsapp','voice'].includes(e.channel))throw Error('Canal inválido');\nreturn [{json:e}];"
+      },
+      "id": "00000000-0000-4000-8000-000000000008",
+      "name": "B · Validação de evento",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        510,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://sdrflow-intelligence-1bxmzi.v2.appdeploy.ai/api/salesos/events/inbound",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "00000000-0000-4000-8000-000000000009",
+      "name": "C · Registrar evento no SalesOS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        810,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "A · Webhook eventos normalizados": {
+      "main": [
+        [
+          {
+            "node": "B · Validação de evento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "B · Validação de evento": {
+      "main": [
+        [
+          {
+            "node": "C · Registrar evento no SalesOS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false,
+  "pinData": {}
+}

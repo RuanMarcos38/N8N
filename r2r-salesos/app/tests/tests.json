@@ -1,0 +1,112 @@
+[
+  {
+    "name": "Criar empresa e contato com elegibilidade e persistência",
+    "sanity": true,
+    "viewport": "desktop",
+    "covers": [
+      "autenticação",
+      "empresa e nicho",
+      "cadastro e persistência de lead",
+      "LGPD validação",
+      "GET /api/salesos/bootstrap",
+      "POST /api/salesos/leads"
+    ],
+    "description": "Cria uma empresa e adiciona um lead com origem e base legal comprovadas.",
+    "steps": [
+      "Entrar na conta",
+      "Clicar Nova empresa e cadastrar Operação de Teste",
+      "Abrir Contatos & Empresas e criar lead Paula Teste com e-mail, origem Formulário e consentimento",
+      "Atualizar e confirmar a permanência de Operação de Teste e Paula Teste"
+    ],
+    "expected": "Empresa e lead cadastrados continuam no ambiente após atualização."
+  },
+  {
+    "name": "Criar campanha e preservar bloqueio de produção",
+    "viewport": "desktop",
+    "covers": [
+      "campanhas multicanal",
+      "criação em rascunho",
+      "bloqueio de envios sem homologação",
+      "POST /api/salesos/campaigns",
+      "POST /api/salesos/campaigns/:id/action"
+    ],
+    "description": "A campanha criada não começa a enviar mensagens sem integração homologada.",
+    "setup": [
+      "Criar empresa Operação Campanhas"
+    ],
+    "steps": [
+      "Abrir Cadências & Campanhas e cadastrar campanha Qualificação com E-mail e Voz",
+      "Verificar que foi criada como Rascunho",
+      "Tentar ativar sem homologação e verificar mensagem de impedimento",
+      "Abrir novamente a campanha e confirmar que continua em rascunho"
+    ],
+    "expected": "A campanha permanece parada e o backend recusa ativação não homologada."
+  },
+  {
+    "name": "Kanban com avanço e supressão de contato",
+    "viewport": "desktop",
+    "covers": [
+      "pipeline drag/drop",
+      "atualização de estágio",
+      "contato bloqueado",
+      "PUT /api/salesos/leads/:id",
+      "auditoria"
+    ],
+    "description": "Permite alterar estágio e interromper contatos por oposição.",
+    "setup": [
+      "Criar empresa Teste Kanban e lead Leo Teste com consentimento"
+    ],
+    "steps": [
+      "Abrir Pipeline Comercial e mover Leo Teste para Validado",
+      "Abrir Contatos & Empresas e confirmar etapa Validado",
+      "Bloquear contato Leo Teste e confirmar",
+      "Verificar que o contato não aparece em colunas de prospecção"
+    ],
+    "expected": "Etapa muda e o bloqueio impede reapresentação no pipeline ativo."
+  },
+  {
+    "name": "Agente e base de conhecimento com conteúdo persistente",
+    "viewport": "mobile",
+    "covers": [
+      "responsividade",
+      "configuração de agente",
+      "conhecimento textual",
+      "POST /api/salesos/records/:kind",
+      "GET /api/salesos/bootstrap"
+    ],
+    "description": "Grava um agente não ativado e uma fonte textual por empresa.",
+    "setup": [
+      "Criar empresa Operação IA"
+    ],
+    "steps": [
+      "No celular abrir Agentes de IA e criar agente Consultivo",
+      "Conferir status de configuração não ativa",
+      "Abrir Base de Conhecimento e cadastrar um texto Verificação comercial",
+      "Atualizar e conferir que ambos permanecem"
+    ],
+    "expected": "Agente e conhecimento permanecem visíveis, com agente sem execução autônoma."
+  },
+  {
+    "name": "Conflito de horário e carteira sem créditos inventados",
+    "viewport": "desktop",
+    "covers": [
+      "agendamento real",
+      "proteção contra dupla reserva",
+      "carteira sandbox",
+      "autorização para recarga",
+      "POST /api/salesos/records/appointments",
+      "POST /api/salesos/wallet/topup"
+    ],
+    "description": "Uma reunião persiste, o mesmo horário não deve ser duplicado e carteira vazia não mostra saldo fictício.",
+    "setup": [
+      "Criar empresa Operação Agenda"
+    ],
+    "steps": [
+      "Abrir Agenda Inteligente e agendar Reunião Inicial para amanhã às 14h e duração 60 min",
+      "Tentar agendar uma segunda reunião para amanhã às 14h com o mesmo responsável",
+      "Confirmar erro de horário ocupado",
+      "Abrir Carteira & Recargas e verificar saldo inicial zero sem cobrança automática"
+    ],
+    "expected": "A segunda reunião é recusada, o primeiro compromisso permanece e a carteira não inventa créditos."
+  }
+]
