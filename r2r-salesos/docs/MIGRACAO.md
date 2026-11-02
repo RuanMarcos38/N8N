@@ -1,8 +1,5 @@
-# Preservação e migração
+# Migração para VPS
 
-- Importação **aditiva** sob `r2r-salesos/`, sem sobrescrever `README.md`, `database/`, `docs/`, `env/`, `templates/` ou `workflows/` existentes na raiz.
-- Captura: os 15 arquivos textuais do snapshot AppDeploy `1793623299507`.
-- Não foram exportados dados reais de usuários, tabelas gerenciadas, gravações, contas, documentos internos ou segredos.
-- O app no GitHub **não está automaticamente implantado**, nem é homologado para Docker/EasyPanel sem portar o SDK e serviços gerenciados da origem.
-- Migração de banco exige backup, autorização, revisão de esquema, integridade, testes em staging e plano de rollback.
-- Implantação comercial depende de integração dos provedores, idempotência robusta, isolamento de tokens por empresa, política LGPD, validação de tarifa Anatel, conciliação, observabilidade e teste de carga.
+A camada de execução local substitui os SDKs AppDeploy. O Dockerfile e EASYPANEL.md documentam a implantação. As regras comerciais e a interface do snapshot são preservadas.
+
+A migração de usuários e registros antigos do AppDeploy exige exportação autorizada da origem e importação separada. O banco desta instalação começa vazio. Não copie chaves ou dados pessoais para o repositório público.

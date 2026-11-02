@@ -1,15 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
-import { api, auth, invitesClient } from '@appdeploy/client';
+import { api, auth, invitesClient } from './client';
 import {
   LayoutDashboard, RadioTower, UsersRound, MessagesSquare, Columns3, GitBranch, CalendarDays,
   Bot, BookOpenText, BrainCircuit, ChartNoAxesCombined, Wallet, Cable, UserRoundCog,
   Settings2, ChevronsUpDown, ChevronRight, Menu, X, Plus, Search, Bell, ArrowUpRight,
-  ArrowRight, BadgeCheck, PhoneCall, MessageCircle, Mail, ShieldCheck, CircleHelp, Sparkles,
-  Activity, Clock3, Check, Pause, Play, FileUp, FileDown, Link2, CheckCircle2, CircleAlert,
-  Filter, Moon, Sun, LogOut, Send, ClipboardList, Building2, Target, CreditCard, Coins,
-  LockKeyhole, CalendarCheck2, RotateCw, Ban, FileText, ExternalLink, Copy, Headphones,
-  RefreshCcw, GripVertical, ListChecks, CalendarClock, CircleDot, PhoneOff, Pencil,
-  MoreHorizontal, LoaderCircle, BriefcaseBusiness, Eye, TrendingUp
+  ArrowRight, BadgeCheck, PhoneCall, MessageCircle, ShieldCheck, CircleHelp, Sparkles,
+  Activity, Clock3, Check, Pause, Play, FileUp, FileDown, CheckCircle2, CircleAlert,
+  Moon, Sun, LogOut, Send, ClipboardList, Building2, Target, CreditCard, Coins,
+  LockKeyhole, CalendarCheck2, Ban, FileText, ExternalLink, Copy, 
+  RefreshCcw, GripVertical, ListChecks, CalendarClock, CircleDot, Pencil,
+  LoaderCircle, Eye, TrendingUp
 } from 'lucide-react';
 import './salesos.css';
 
@@ -51,10 +51,6 @@ const getErr=(e:unknown)=>{
 };
 const first=(s:string)=>s?.split(/\s+/).slice(0,2).map(x=>x[0]).join('').toUpperCase()||'—';
 const allMenu=groups.flatMap(g=>g.links);
-function SectionIcon({name}:{name:string}){
-  const Icon=allMenu.find(v=>v.id===name)?.icon||Activity;
-  return <Icon size={17} strokeWidth={1.8}/>;
-}
 function Kpi({icon:Icon,label,value,foot,tone='blue'}:{icon:any,label:string,value:string,foot:string,tone?:string}){
   return <div className="sos-kpi"><div className="sos-kpi-top"><span>{label}</span><span className={'sos-icon '+tone}><Icon size={17}/></span></div><strong>{value}</strong><small>{foot}</small></div>;
 }
@@ -104,7 +100,6 @@ function App(){
   const activity=filtered('activity').sort((a,b)=>String(b.at).localeCompare(String(a.at)));
   const appointments=filtered('appointments').filter(a=>a.status!=='cancelado').sort((a,b)=>String(a.startAt).localeCompare(String(b.startAt)));
   const opportunities=filtered('opportunities');
-  const tasks=filtered('tasks');
   const wallet=filtered('wallet')[0]||{balanceCents:0,reservedCents:0};
   const ledger=filtered('ledger');
   const topups=filtered('topups');

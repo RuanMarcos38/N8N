@@ -1,5 +1,5 @@
-import { router, json, error, requireAuth, db, secrets } from '@appdeploy/sdk';
-import { salesOsRoutes } from './salesos';
+import { router, json, error, requireAuth, db, secrets } from './runtime.ts';
+import { salesOsRoutes } from './salesos.ts';
 
 type Item = Record<string, any>;
 const clean = (s: string) => s.replace(/[^A-Za-z0-9]/g, '').slice(0, 70);

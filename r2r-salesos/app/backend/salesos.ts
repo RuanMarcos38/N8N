@@ -1,5 +1,5 @@
-import { db, json, error, requireAuth, ai, storage, secrets, invites, isInviteError, increment } from '@appdeploy/sdk';
-import type { RouterRoutes } from '@appdeploy/sdk';
+import { db, json, error, requireAuth, ai, storage, secrets, invites, isInviteError, increment } from './runtime.ts';
+import type { RouterRoutes } from './runtime.ts';
 
 type R = Record<string, any>;
 type Ctx = { user?: {userId:string;email?:string;name?:string}; body: unknown; params:Record<string,string>; query:Record<string,string>; event:any };

@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import SalesOSApp from './SalesOSApp';
-import { auth, api } from '@appdeploy/client';
+import { auth, api } from './client';
 import {
   LayoutDashboard,
   Users,
@@ -11,7 +11,6 @@ import {
   Settings,
   BarChart3,
   Search,
-  Bell,
   ChevronDown,
   Plus,
   PhoneCall,
@@ -36,13 +35,10 @@ import {
   LogOut,
   ChevronRight,
   FileText,
-  Ban,
   Globe2,
   Activity,
   CalendarClock,
   CircleDot,
-  Filter,
-  Database,
   Link2,
   Copy,
 } from 'lucide-react';
@@ -79,12 +75,6 @@ const channelLabel: Row = {
   whatsapp: 'WhatsApp',
   voice: 'Ligação IA',
 };
-const money = (n: number) =>
-  new Intl.NumberFormat('pt-BR', {
-    style: 'currency',
-    currency: 'BRL',
-    maximumFractionDigits: 0,
-  }).format(n);
 const today = () => new Date().toLocaleDateString('pt-BR');
 const pill = (s: string) =>
   s === 'active'
@@ -265,7 +255,6 @@ function App() {
     setModal(name);
     setImportRows([]);
   };
-  const workspace = data.workspaces.find(w => w.id === workspaceId);
   const scoped = (rows: Row[]) =>
     rows.filter(r => workspaceId === 'all' || r.workspaceId === workspaceId);
   const leads = scoped(data.leads).filter(l =>
