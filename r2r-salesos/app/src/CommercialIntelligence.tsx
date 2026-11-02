@@ -29,6 +29,7 @@ export default function CommercialIntelligence({ workspaceId, userId, editable, 
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState('');
   const saveRequest = useRef('');
+  const generationRequest = useRef('');
 
   const remember = (value: Studio, changed: boolean) => {
     try { localStorage.setItem(cacheKey, JSON.stringify({ studio: value, dirty: changed })); }
@@ -73,6 +74,7 @@ export default function CommercialIntelligence({ workspaceId, userId, editable, 
     setDirty(true);
     setError('');
     saveRequest.current = '';
+    generationRequest.current = '';
     remember(next, true);
   };
 
@@ -112,10 +114,23 @@ export default function CommercialIntelligence({ workspaceId, userId, editable, 
     setGenerating(true);
     setError('');
     try {
+      if (!generationRequest.current) generationRequest.current = crypto.randomUUID().replace(/-/g, '');
       const response = await api.post('/api/salesos/ai/draft', {
-        workspaceId, channel: studio.channel, objective: studio.objective, offer: studio.offer,
+        workspaceId, channel: studio.channel, objective: studio.objective, offer: studio.offer, requestId: generationRequest.current,
       });
-      change('content', response.data.text);
+      let result = response.data;
+      if (result.jobId) {
+        const deadline = Date.now() + 240000;
+        while (Date.now() < deadline) {
+          const update = await api.get('/api/salesos/ai/jobs/' + result.jobId + '?workspaceId=' + encodeURIComponent(workspaceId));
+          if (update.data.state === 'completed') { result = update.data; break; }
+          if (update.data.state === 'failed') { generationRequest.current = ''; throw new Error(update.data.error || 'A IA não concluiu o rascunho.'); }
+          await new Promise(resolve => setTimeout(resolve, 4000));
+        }
+        if (!result.text) throw new Error('A IA ainda está processando. Tente consultar novamente em instantes.');
+      }
+      if (typeof result.text !== 'string' || !result.text.trim()) throw new Error('A IA retornou um rascunho vazio.');
+      change('content', result.text);
       onNotice('Rascunho gerado. Revise o texto e salve sua personalização.');
     } catch (e) { setError(message(e)); }
     finally { setGenerating(false); }

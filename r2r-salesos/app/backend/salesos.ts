@@ -1,4 +1,4 @@
-import { bridgeStatus, testBridge, bridgeEnabled, callBridge, installationOwnerEmail } from './n8nBridge.ts';
+import { bridgeStatus, testBridge, bridgeEnabled, callBridge, installationOwnerEmail, aiCallbackUrl } from './n8nBridge.ts';
 import { db, json, error, requireAuth, requireAdminEmailAllowlist, ai, storage, secrets, invites, isInviteError, increment } from './runtime.ts';
 import type { RouterRoutes } from './runtime.ts';
 
@@ -297,11 +297,67 @@ async function generateDraft(c:Ctx){
   const knowledge=(await all(tab('knowledge',s.ownerId),100)).filter(x=>x.workspaceId===norm(b.workspaceId)&&x.content).map(x=>x.title+'\n'+x.content).join('\n').slice(0,9000);
   if(!knowledge&&!norm(b.offer))throw new Error('Cadastre a oferta ou conhecimento autorizado antes de gerar.');
   const prompt=['Crie um RASCUNHO de abordagem de prospecção, para revisão humana.','Empresa: '+s.workspace.name,'Nicho: '+(s.workspace.niche||''),'Canal: '+channel,'Objetivo: '+norm(b.objective),'Oferta validada: '+norm(b.offer),'Base autorizada: '+knowledge,'Regras: PT-BR, identifique a IA no canal voz, seja respeitoso, conciso, sem promessas, preços ou dados inventados. Respeite recusas; não presuma consentimento.','Devolva apenas o texto comercial.'].join('\n');
-  const response = await bridgeEnabled(s.ownerId)
-    ? await callBridge(s.ownerId, 'ai.draft', { prompt })
-    : await ai.generate({prompt,maxTokens:550,thinkingMode:'FAST'});
+  if (await bridgeEnabled(s.ownerId)) {
+    const jobId = norm(b.requestId);
+    if (!/^[a-f0-9]{32}$/.test(jobId)) throw new Error('Identificação da geração inválida.');
+    const [existing] = await db.get<R>('salesos_ai_jobs', [jobId], { consistent: true });
+    if (existing) {
+      if (existing.ownerId !== s.ownerId || existing.workspaceId !== norm(b.workspaceId) || existing.prompt !== prompt) {
+        throw new Error('Este pedido já pertence a outra geração.');
+      }
+      if (existing.state === 'completed') return { text: existing.text, draft: true };
+      if (existing.state === 'failed') throw new Error(existing.error || 'A IA local não concluiu o rascunho.');
+      return { jobId, queued: true };
+    }
+    const job = { id: jobId, ownerId: s.ownerId, workspaceId: norm(b.workspaceId), prompt,
+      state: 'starting', createdAt: now(), expiresAt: new Date(Date.now() + 600000).toISOString() };
+    const [saved] = await db.tx.add('salesos_ai_jobs', [job]);
+    if (!saved) throw new Error('Este pedido já está sendo processado. Tente consultar novamente.');
+    try {
+      await callBridge(s.ownerId, 'ai.draft', { prompt, jobId, callbackUrl: aiCallbackUrl });
+      await db.tx.update('salesos_ai_jobs', [{ id: jobId, record: { state: 'queued' }, if: { state: 'starting' } }], { patch: true });
+      return { jobId, queued: true };
+    } catch (e) {
+      await db.tx.update('salesos_ai_jobs', [{ id: jobId, record: { state: 'failed', error: 'Não foi possível iniciar a geração no n8n.' }, if: { state: 'starting' } }], { patch: true });
+      throw e;
+    }
+  }
+  const response = await ai.generate({prompt,maxTokens:550,thinkingMode:'FAST'});
   await audit(s.ownerId,norm(b.workspaceId),'Rascunho comercial gerado por IA para revisão','ai');
   return {text:response.text,draft:true};
+}
+
+async function readAiJob(c: Ctx) {
+  const s = await requireScope(c, 'read');
+  const [job] = await db.get<R>('salesos_ai_jobs', [c.params.id], { consistent: true });
+  if (!job || job.ownerId !== s.ownerId || job.workspaceId !== norm(c.query.workspaceId)) {
+    throw new Error('Geração não encontrada nesta empresa.');
+  }
+  if (job.state !== 'completed' && Date.parse(job.expiresAt) < Date.now()) {
+    return { state: 'failed', error: 'A geração expirou. Inicie um novo pedido.' };
+  }
+  return { state: job.state, text: job.state === 'completed' ? job.text : '', error: job.state === 'failed' ? job.error : '' };
+}
+
+async function receiveAiResult(c: Ctx) {
+  const names = await secrets.listSecretNames();
+  if (!names.includes('N8N_WEBHOOK_TOKEN')) return error('Conector não configurado.', 503);
+  const expected = await secrets.readSecret('N8N_WEBHOOK_TOKEN');
+  if (!expected || header(c, 'x-sdr-token') !== expected) return error('Não autorizado.', 401);
+  const b = body(c), jobId = norm(b.jobId);
+  if (!/^[a-f0-9]{32}$/.test(jobId)) return error('Pedido inválido.', 400);
+  const [job] = await db.get<R>('salesos_ai_jobs', [jobId], { consistent: true });
+  if (!job) return error('Pedido não encontrado.', 404);
+  if (job.state === 'completed') return json({ ok: true, duplicate: true });
+  const text = norm(b.text);
+  const completed = b.success === true && text.length > 0 && text.length <= 24000;
+  const [updated] = await db.tx.update('salesos_ai_jobs', [{ id: jobId, record: {
+    state: completed ? 'completed' : 'failed', text: completed ? text : '',
+    error: completed ? '' : 'A IA local não conseguiu concluir o rascunho. Tente novamente.', completedAt: now(),
+  }, if: { state: job.state } }], { patch: true });
+  if (!updated) return error('Resultado já alterado. Consulte o pedido.', 409);
+  if (completed) await audit(job.ownerId, job.workspaceId, 'Rascunho comercial gerado pela IA local para revisão', 'ai');
+  return json({ ok: true });
 }
 
 async function cancelAppointment(c:Ctx){
@@ -558,6 +614,12 @@ async function syncBridgeInbox(c: Ctx) {
 }
 
 export const salesOsRoutes:RouterRoutes={
+  'GET /api/salesos/ai/jobs/:id': [requireAuth(), async c => {
+    try { return json(await readAiJob(c)); } catch (e) { return respond(e); }
+  }],
+  'POST /api/salesos/n8n/ai/result': [async c => {
+    try { return await receiveAiResult(c); } catch (e) { return respond(e); }
+  }],
   'POST /api/salesos/n8n/inbox': [requireAuth(), async c => {
     try { return json(await syncBridgeInbox(c)); } catch (e) { return respond(e); }
   }],

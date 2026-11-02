@@ -2,6 +2,7 @@ import { db, secrets } from './runtime.ts';
 
 type RecordValue = Record<string, any>;
 export const installationOwnerEmail = process.env.N8N_CONNECTION_OWNER_EMAIL || '';
+export const aiCallbackUrl = (process.env.APP_URL || 'http://localhost:3000') + '/api/salesos/n8n/ai/result';
 export const n8nGatewayUrl = 'https://n8n-n8n.ke4n49.easypanel.host/webhook/r2r-salesos/v1';
 const table = 'salesos_bridge_connection';
 
@@ -34,7 +35,7 @@ export async function callBridge(ownerId: string, action: string, payload: Recor
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-SDR-Token': token },
     body: JSON.stringify({ ...payload, action }),
-    signal: AbortSignal.timeout(action === 'ai.draft' ? 60000 : 30000),
+    signal: AbortSignal.timeout(22000),
   });
   if (!response.ok) {
     throw new Error('O conector n8n retornou HTTP ' + response.status + '. Verifique a conexão antes de repetir a operação.');

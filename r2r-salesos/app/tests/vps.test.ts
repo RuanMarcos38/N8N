@@ -82,7 +82,25 @@ test('atomic reservations rollback, conditional updates, pagination and incremen
    assert.equal(status.services.filter(s=>s.connected).length,4);
    assert.equal(JSON.stringify(status).includes(process.env.N8N_WEBHOOK_TOKEN!),false);
    await assert.rejects(bridge.callBridge('other-owner','health'));
+   const {salesOsRoutes}=await import('../backend/salesos.ts');
+   await db.add('sdr_workspaces_realowner',[{id:'async-ws',name:'Async test'}]);
+   const ctx:any={user:{userId:'real-owner'},body:{workspaceId:'async-ws',offer:'Oferta verificada',requestId:'a'.repeat(32)},params:{},query:{workspaceId:'async-ws'},event:{headers:{}}};
+   const invoke=async(key:string,c:any)=>{const handlers=salesOsRoutes[key];return await (handlers.at(-1) as any)(c);};
+   let calls=0;
+   globalThis.fetch=async(_input,init)=>{calls++;const b=JSON.parse(String(init?.body));assert.equal(b.action,'ai.draft');assert.equal(b.jobId,'a'.repeat(32));return new Response(JSON.stringify({ok:true,queued:true}),{status:200});};
+   assert.equal((await invoke('POST /api/salesos/ai/draft',ctx)).body.queued,true);
+   assert.equal((await invoke('POST /api/salesos/ai/draft',ctx)).body.queued,true);assert.equal(calls,1);
+   const cb={...ctx,body:{jobId:'a'.repeat(32),success:true,text:'Rascunho concluído'},event:{headers:{'x-sdr-token':'invalid'}}};
+   assert.equal((await invoke('POST /api/salesos/n8n/ai/result',cb)).statusCode,401);
+   cb.event.headers['x-sdr-token']=process.env.N8N_WEBHOOK_TOKEN!;
+   assert.equal((await invoke('POST /api/salesos/n8n/ai/result',cb)).statusCode,200);
+   cb.body.text='Não sobrescrever';await invoke('POST /api/salesos/n8n/ai/result',cb);
+   const poll={...ctx,params:{id:'a'.repeat(32)}};
+   assert.equal((await invoke('GET /api/salesos/ai/jobs/:id',poll)).body.text,'Rascunho concluído');
+   assert.equal((await invoke('GET /api/salesos/ai/jobs/:id',{...poll,user:{userId:'other-owner'}})).statusCode,400);
+
  } finally { globalThis.fetch=realFetch;delete process.env.N8N_WEBHOOK_TOKEN;delete process.env.N8N_CONNECTION_OWNER_EMAIL; }
  await db.add('pages',[{id:'a'},{id:'b'},{id:'c'}]);const first=await db.list('pages',{limit:2});assert.equal(first.items.length,2);assert.equal((await db.list('pages',{limit:2,nextToken:first.nextToken})).items.length,1);
  }finally{sqlite.close();rmSync(dir,{recursive:true,force:true});}
 });
+
